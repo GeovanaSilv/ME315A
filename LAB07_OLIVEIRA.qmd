@@ -1,0 +1,220 @@
+---
+title: "LAB07_OLIVEIRA"
+author: "Geovana Oliveira Barros Silva - 175367"
+format: pdf
+editor: source
+---
+
+## Laboratório 7
+
+1.  Baixe o arquivo uwmadison.sqlite3. Conecte-se a ele usando o pacote RSQLite, armazenando a conexão em uma variável conn.
+```{r}
+library("RSQLite")
+
+conn <- dbConnect(SQLite(),"uwmadison.sqlite3")
+dbListTables(conn)
+```
+
+2.  Quem são e quantos são os professores que lecionaram disciplinas cujo tópico era estatística (subjects.abbreviation='STAT');
+```{r}
+professores = "SELECT COUNT(DISTINCT instructors.id) 
+FROM instructors 
+JOIN teachings
+    ON instructors.id = teachings.instructor_id 
+JOIN sections 
+  ON teachings.section_uuid = sections.uuid
+JOIN subject_memberships
+  ON sections.course_offering_uuid =
+subject_memberships.course_offering_uuid
+JOIN subjects 
+  ON subject_memberships.subject_code = subjects.code
+WHERE subjects.abbreviation='STAT'"
+
+dbGetQuery(conn, professores)
+```
+
+3.  O GPA americano é definido numa escala de 0 a 4, em que A = 4, AB = 3.5, B = 3, BC = 2.5, C = 2, D = 1 e F = 0. Determinando a nota média de cada oferecimento pela ponderação da quantidade de alunos em cada extrato com os valores numéricos de cada conceito, indique (no que se referente a disciplinas no assunto de estatística):
+
+
+
+* Quem é o professor mais difícil?
+
+```{r}
+professores_d <- "
+SELECT 
+    instructors.name,
+    SUM(
+        COALESCE(a_count, 0) * 4.0 + 
+        COALESCE(ab_count, 0) * 3.5 + 
+        COALESCE(b_count, 0) * 3.0 + 
+        COALESCE(bc_count, 0) * 2.5 + 
+        COALESCE(c_count, 0) * 2.0 + 
+        COALESCE(d_count, 0) * 1.0
+    ) / 
+    NULLIF(SUM(
+        COALESCE(a_count, 0) + 
+        COALESCE(ab_count, 0) + 
+        COALESCE(b_count, 0) + 
+        COALESCE(bc_count, 0) + 
+        COALESCE(c_count, 0) + 
+        COALESCE(d_count, 0) + 
+        COALESCE(f_count, 0)
+    ), 0) AS GPA
+    
+
+FROM instructors 
+JOIN teachings 
+    ON instructors.id = teachings.instructor_id 
+JOIN sections 
+    ON teachings.section_uuid = sections.uuid
+JOIN subject_memberships 
+    ON sections.course_offering_uuid = subject_memberships.course_offering_uuid
+JOIN subjects 
+    ON subject_memberships.subject_code = subjects.code
+JOIN grade_distributions 
+    ON grade_distributions.course_offering_uuid = sections.course_offering_uuid
+
+WHERE subjects.abbreviation = 'STAT'
+
+GROUP BY instructors.id, instructors.name
+HAVING GPA IS NOT NULL
+ORDER BY GPA ASC
+LIMIT 1
+"
+
+ dbGetQuery(conn, professores_d)
+
+```
+
+
+* Quem é o professor mais fácil?
+```{r}
+professores_f <- "
+SELECT 
+    instructors.name,
+    SUM(
+        COALESCE(a_count, 0) * 4.0 + 
+        COALESCE(ab_count, 0) * 3.5 + 
+        COALESCE(b_count, 0) * 3.0 + 
+        COALESCE(bc_count, 0) * 2.5 + 
+        COALESCE(c_count, 0) * 2.0 + 
+        COALESCE(d_count, 0) * 1.0
+    ) / 
+    NULLIF(SUM(
+        COALESCE(a_count, 0) + 
+        COALESCE(ab_count, 0) + 
+        COALESCE(b_count, 0) + 
+        COALESCE(bc_count, 0) + 
+        COALESCE(c_count, 0) + 
+        COALESCE(d_count, 0) + 
+        COALESCE(f_count, 0)
+    ), 0) AS GPA
+
+FROM instructors 
+JOIN teachings 
+    ON instructors.id = teachings.instructor_id 
+JOIN sections 
+    ON teachings.section_uuid = sections.uuid
+JOIN subject_memberships 
+    ON sections.course_offering_uuid = subject_memberships.course_offering_uuid
+JOIN subjects 
+    ON subject_memberships.subject_code = subjects.code
+JOIN grade_distributions 
+    ON grade_distributions.course_offering_uuid = sections.course_offering_uuid
+
+WHERE subjects.abbreviation = 'STAT'
+
+GROUP BY instructors.id, instructors.name
+HAVING  GPA IS NOT NULL
+ORDER BY GPA DESC
+LIMIT 1
+"
+
+dbGetQuery(conn, professores_f)
+
+
+```
+
+
+* Qual é a disciplina mais difícil?
+```{r}
+materia_d <- "
+
+SELECT 
+courses.number,
+    courses.name,
+    SUM(a_count * 4 + ab_count * 3.5 +
+    b_count * 3 + bc_count * 2.5 + c_count * 2 + d_count * 1)/
+    SUM(a_count + ab_count + b_count + 
+    bc_count + c_count + d_count + f_count) AS GPA
+FROM courses
+JOIN course_offerings 
+  ON courses.uuid = course_offerings.course_uuid
+  
+JOIN subject_memberships 
+    ON course_offerings.uuid = subject_memberships.course_offering_uuid
+    
+JOIN subjects 
+      ON subject_memberships.subject_code = subjects.code
+      
+JOIN grade_distributions 
+      ON grade_distributions.course_offering_uuid = course_offerings.uuid
+      
+WHERE subjects.abbreviation = 'STAT'
+GROUP BY courses.uuid, courses.number, courses.name
+HAVING GPA IS NOT NULL
+ORDER BY GPA ASC
+LIMIT 1
+"
+
+
+dbGetQuery(conn, materia_d)
+
+
+```
+
+
+* Qual é a disciplina mais fácil?
+
+
+```{r}
+materia_f <- "
+
+SELECT 
+courses.number,
+    courses.name,
+    SUM(a_count * 4 + ab_count * 3.5 +
+    b_count * 3 + bc_count * 2.5 + c_count * 2 + d_count * 1)/
+    SUM(a_count + ab_count + b_count + 
+    bc_count + c_count + d_count + f_count) AS GPA
+FROM courses
+JOIN course_offerings 
+  ON courses.uuid = course_offerings.course_uuid
+  
+JOIN subject_memberships 
+    ON course_offerings.uuid = subject_memberships.course_offering_uuid
+    
+JOIN subjects 
+      ON subject_memberships.subject_code = subjects.code
+      
+JOIN grade_distributions 
+      ON grade_distributions.course_offering_uuid = course_offerings.uuid
+      
+WHERE subjects.abbreviation = 'STAT'
+GROUP BY courses.uuid, courses.number, courses.name
+HAVING GPA IS NOT NULL
+ORDER BY GPA DESC
+LIMIT 1
+"
+
+
+dbGetQuery(conn, materia_f)
+
+
+```
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+
+```
+
